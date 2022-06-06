@@ -176,7 +176,7 @@ mod permutation {
     }
 }
 
-/// return a mapping [sum |-> count] of all subset sums of the given vector.
+// return a mapping [sum |-> count] of all subset sums of the given vector.
 fn subset_sums(v: Vec<i64>) -> HashMap<i64, i64> {
     assert!(v.len() <= 64);
 
@@ -194,7 +194,6 @@ fn subset_sums(v: Vec<i64>) -> HashMap<i64, i64> {
     sums
 }
 
-/// return a set of all subset sums
 fn subset_sums_set(v: Vec<i64>) -> HashSet<i64> {
     assert!(v.len() <= 64);
 
@@ -252,43 +251,6 @@ fn lis_binary() {
     //         g[fi] = min(g[fi], Ai);
     //     }
     // }
-}
-
-/// Knapsack using dp
-fn knapsack() {
-    // let N = next_token!(usize);
-    //     let W = next_token!(i64);
-
-    //     let mut profits = Vec::with_capacity(N);
-    //     let mut weights = Vec::with_capacity(N);
-    //     for _ in 0..N {
-    //         profits.push(next_token!(i64));
-    //         weights.push(next_token!(i64));
-    //     }
-
-    //     let mut dp = vec![vec![0; N]; (W + 1) as usize];
-    //     for v in 0..=W {
-    //         for i in 0..N {
-    //             dp[v as usize][i] = if i == 0 {
-    //                 if v < weights[0] {
-    //                     0
-    //                 } else {
-    //                     profits[0]
-    //                 }
-    //             } else {
-    //                 if v < weights[i] {
-    //                     dp[v as usize][i - 1]
-    //                 } else {
-    //                     max(
-    //                         dp[v as usize][i - 1],
-    //                         profits[i] + dp[(v - weights[i]) as usize][i - 1],
-    //                     )
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     println!("{}", dp[W as usize][N - 1]);
 }
 
 /// -------------- PARSER --------------------
