@@ -1,6 +1,6 @@
 /// ---------- IMPORTS ----------------
 use std::{
-    cmp::Ordering,
+    cmp::{max, min, Ordering},
     collections::{HashMap, HashSet, VecDeque},
     io::{self, Read},
 };
@@ -468,29 +468,6 @@ fn dfs(adj: &Vec<Vec<usize>>, start: usize) -> Vec<bool> {
     visited
 }
 
-fn dfs_depth(adj: &Vec<Vec<usize>>, start: usize, max_depth: u64) -> Vec<bool> {
-    let n = adj.len();
-    let mut border = VecDeque::with_capacity(n);
-    border.push_back((start, 0));
-    let mut visited: Vec<bool> = vec![false; n];
-    visited[start] = true;
-
-    while !border.is_empty() {
-        let (v, vd) = border.pop_back().unwrap();
-
-        if vd < max_depth {
-            for neighbor in &adj[v] {
-                if !visited[*neighbor] {
-                    border.push_back((*neighbor, vd + 1));
-                    visited[*neighbor] = true;
-                }
-            }
-        }
-    }
-
-    visited
-}
-
 fn dfs_rec(adj: &Vec<Vec<usize>>, visited: &mut Vec<bool>, start: usize, max_depth: u64) {
     visited[start] = true;
 
@@ -502,6 +479,624 @@ fn dfs_rec(adj: &Vec<Vec<usize>>, visited: &mut Vec<bool>, start: usize, max_dep
         if !visited[*neighbor] {
             dfs_rec(adj, visited, *neighbor, max_depth - 1);
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VType {
+    Unvisited,
+    Exploring,
+    Finished,
+}
+
+// returns true if cycle exists
+fn dfs_cycle(adj: &Vec<Vec<usize>>, visited: &mut Vec<VType>, start: usize) -> bool {
+    visited[start] = VType::Exploring;
+
+    for &neighbor in &adj[start] {
+        if visited[neighbor] == VType::Unvisited {
+            if dfs_cycle(adj, visited, neighbor) {
+                return true;
+            }
+        } else if visited[neighbor] == VType::Exploring {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Color {
+    Red,
+    Blue,
+}
+
+impl Color {
+    fn next(self) -> Self {
+        match self {
+            Color::Red => Color::Blue,
+            Color::Blue => Color::Red,
+        }
+    }
+}
+
+fn dfs_color(adj: &Vec<Vec<usize>>, colors: &mut Vec<Option<Color>>, start: usize) -> bool {
+    for &neighbor in &adj[start] {
+        if colors[neighbor].is_none() {
+            colors[neighbor] = Some(colors[start].unwrap().next());
+        } else if colors[start].unwrap() == colors[neighbor].unwrap() {
+            return false;
+        }
+    }
+
+    true
+}
+
+// bipartite check
+fn color_graph(adj: &Vec<Vec<usize>>, start: usize) -> bool {
+    let n = adj.len();
+    let mut colors = vec![None; n];
+    colors[start] = Some(Color::Red);
+
+    dfs_color(adj, &mut colors, start)
+}
+
+mod dijkstra {
+    use std::{cmp::Ordering, collections::BinaryHeap};
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct DEntry {
+        v: usize,
+        cost: u64,
+    }
+
+    impl Ord for DEntry {
+        fn cmp(&self, other: &Self) -> Ordering {
+            other
+                .cost
+                .cmp(&self.cost)
+                .then_with(|| self.v.cmp(&other.v))
+        }
+    }
+
+    impl PartialOrd for DEntry {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    struct Edge {
+        v: usize,
+        cost: u64,
+    }
+
+    fn dijkstra(adj: &Vec<Vec<Edge>>, start: usize, goal: usize) -> Option<u64> {
+        let n = adj.len();
+        let mut dist = vec![u64::MAX; n];
+        let mut pq = BinaryHeap::with_capacity(n);
+
+        dist[start] = 0;
+        pq.push(DEntry { v: start, cost: 0 });
+
+        while let Some(DEntry { v, cost }) = pq.pop() {
+            if v == goal {
+                return Some(cost);
+            }
+
+            if cost > dist[v] {
+                continue;
+            }
+
+            for edge in &adj[v] {
+                let next = DEntry {
+                    v: edge.v,
+                    cost: edge.cost + cost,
+                };
+
+                if next.cost < dist[next.v] {
+                    dist[next.v] = next.cost;
+                    pq.push(next);
+                }
+            }
+        }
+        None
+    }
+}
+
+mod dijkstra_rich {
+    use std::{cmp::Ordering, collections::BinaryHeap};
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct DEntry {
+        v: usize,
+        cost: u64,
+        lds: usize,
+    }
+
+    impl Ord for DEntry {
+        fn cmp(&self, other: &Self) -> Ordering {
+            other
+                .cost
+                .cmp(&self.cost)
+                .then_with(|| self.v.cmp(&other.v))
+        }
+    }
+
+    impl PartialOrd for DEntry {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    enum ET {
+        LongDistance,
+        Regional,
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    struct Edge {
+        v: usize,
+        cost: u64,
+        ty: ET,
+    }
+
+    fn dijkstra(adj: &Vec<Vec<Edge>>, start: usize, goal: usize, t: usize) -> Option<u64> {
+        let n = adj.len();
+        // dist keeps track of the length depending on the number of long distance trains
+        let mut dist = vec![vec![u64::MAX; t + 1]; n];
+        let mut pq = BinaryHeap::with_capacity(n);
+
+        dist[start][0] = 0;
+        // we start with no long distance trains used
+        pq.push(DEntry {
+            v: start,
+            cost: 0,
+            lds: 0,
+        });
+
+        while let Some(e) = pq.pop() {
+            // we must never put something with lds > t in pq
+            if e.v == goal {
+                return Some(e.cost);
+            }
+
+            if e.cost > dist[e.v][e.lds] {
+                continue;
+            }
+
+            for edge in &adj[e.v] {
+                let next = DEntry {
+                    v: edge.v,
+                    cost: edge.cost + e.cost,
+                    lds: match edge.ty {
+                        ET::LongDistance => e.lds + 1,
+                        ET::Regional => e.lds,
+                    },
+                };
+
+                if next.lds > t {
+                    continue;
+                }
+
+                if next.cost < dist[next.v][next.lds] {
+                    dist[next.v][next.lds] = next.cost;
+                    pq.push(next);
+                }
+            }
+        }
+        None
+    }
+}
+
+mod floyd_warshall {
+    use super::*;
+
+    // NOTE: adj is adjancency matrix
+    fn floyd_warshall(adj: &mut Vec<Vec<usize>>) {
+        let n = adj.len();
+
+        for k in 0..n {
+            for i in 0..n {
+                for j in 0..n {
+                    adj[i][j] = min(adj[i][j], adj[i][k] + adj[k][j]);
+                }
+            }
+        }
+    }
+}
+
+mod bellman_ford {
+    use super::*;
+
+    // NOTE: adj is weighted adjancency list
+    fn bellman_ford(adj: &Vec<Vec<(usize, i64)>>, start: usize) {
+        let n = adj.len();
+        let mut dist = vec![i64::MAX; n];
+        dist[start] = 0;
+
+        // relax everything n-1 times
+        for i in 0..n - 1 {
+            for v in 0..n {
+                for &(neighbor, w) in &adj[v] {
+                    dist[neighbor] = min(dist[neighbor], dist[v] + w);
+                }
+            }
+        }
+    }
+}
+
+mod toposort {
+
+    fn topo(adj: &Vec<Vec<usize>>, ts: &mut Vec<usize>) -> Option<()> {
+        let n = adj.len();
+        let mut visited = vec![false; n];
+
+        for i in 0..n {
+            if !visited[i] {
+                let mut stack = vec![false; n];
+                stack[i] = true;
+                if let None = dfs_rec(adj, &mut visited, ts, &mut stack, i) {
+                    return None;
+                }
+            }
+        }
+        ts.reverse();
+        Some(())
+    }
+
+    fn dfs_rec(
+        adj: &Vec<Vec<usize>>,   // adjacency list
+        visited: &mut Vec<bool>, // which nodes have been visited during the toposort
+        ts: &mut Vec<usize>,     // the final topological sort. Add each node when we leave it.
+        stack: &mut Vec<bool>,   // which nodes have been visited during this dfs run
+        start: usize,
+    ) -> Option<()> {
+        visited[start] = true;
+
+        for neighbor in &adj[start] {
+            if !visited[*neighbor] {
+                stack[*neighbor] = true;
+                if dfs_rec(adj, visited, ts, stack, *neighbor).is_none() {
+                    return None;
+                }
+                stack[*neighbor] = false;
+            } else if stack[*neighbor] {
+                // got a cycle
+                return None;
+            }
+        }
+
+        ts.push(start);
+        Some(())
+    }
+}
+
+mod bridges {
+    // Articulation point: A vertex whose removal (as well as its incident edges) increases the
+    // number of connected components is called an Articulation Point.
+    // Bridge: An edge whose removal increases the number of connected
+    // components is called a Bridge.
+
+    use super::*;
+
+    const UNVISITED: i64 = -1;
+
+    fn ap_and_bridges(adj: &Vec<Vec<usize>>) -> (Vec<usize>, Vec<(usize, usize)>) {
+        let n = adj.len();
+        let mut dfs_counter = 0;
+
+        let mut aps = Vec::new();
+        let mut bridges = Vec::new();
+
+        let mut dfs_num = vec![UNVISITED; n];
+        let mut dfs_min = vec![UNVISITED; n];
+        let mut dfs_parent = vec![-1; n];
+
+        for i in 0..n {
+            if dfs_num[i] == UNVISITED {
+                let dfs_root = i;
+                let mut root_children = 0;
+
+                dfs(
+                    i,
+                    adj,
+                    dfs_root,
+                    &mut root_children,
+                    &mut dfs_counter,
+                    &mut dfs_num,
+                    &mut dfs_min,
+                    &mut dfs_parent,
+                    &mut aps,
+                    &mut bridges,
+                );
+
+                if root_children > 1 {
+                    aps.push(i);
+                }
+            }
+        }
+
+        (aps, bridges)
+    }
+
+    fn dfs(
+        start: usize,
+        adj: &Vec<Vec<usize>>,
+        dfs_root: usize,
+        root_children: &mut usize,
+        dfs_counter: &mut i64,
+        dfs_num: &mut Vec<i64>,
+        dfs_min: &mut Vec<i64>,
+        dfs_parent: &mut Vec<i64>,
+        aps: &mut Vec<usize>,
+        bridges: &mut Vec<(usize, usize)>,
+    ) {
+        dfs_min[start] = *dfs_counter;
+        dfs_num[start] = *dfs_counter;
+        *dfs_counter += 1;
+
+        for &neighbor in &adj[start] {
+            if dfs_num[neighbor] == UNVISITED {
+                // tree edge
+                dfs_parent[neighbor] = start as i64;
+                if start == dfs_root {
+                    *root_children += 1;
+                }
+
+                dfs(
+                    neighbor,
+                    adj,
+                    dfs_root,
+                    root_children,
+                    dfs_counter,
+                    dfs_num,
+                    dfs_min,
+                    dfs_parent,
+                    aps,
+                    bridges,
+                );
+
+                if dfs_num[start] <= dfs_min[neighbor] && start != dfs_root {
+                    aps.push(start);
+                }
+                if dfs_num[start] < dfs_min[neighbor] {
+                    bridges.push((start, neighbor));
+                }
+
+                dfs_min[start] = min(dfs_min[start], dfs_min[neighbor]);
+            } else if neighbor as i64 != dfs_parent[start] {
+                // back edge
+                dfs_min[start] = min(dfs_min[start], dfs_num[neighbor]);
+            }
+        }
+    }
+}
+
+mod tarjan {
+    use super::*;
+
+    const UNVISITED: i64 = -1;
+
+    // find strongly connected components
+    fn sccs(adj: &Vec<Vec<usize>>) -> Vec<Vec<usize>> {
+        let n = adj.len();
+        let mut dfs_counter = 0;
+
+        let mut sccs = Vec::new();
+        let mut stack = Vec::with_capacity(n);
+
+        let mut dfs_num = vec![UNVISITED; n];
+        let mut dfs_min = vec![UNVISITED; n];
+        let mut dfs_parent = vec![-1; n];
+
+        for i in 0..n {
+            if dfs_num[i] == UNVISITED {
+                dfs(
+                    i,
+                    adj,
+                    &mut dfs_counter,
+                    &mut dfs_num,
+                    &mut dfs_min,
+                    &mut dfs_parent,
+                    &mut sccs,
+                    &mut stack,
+                );
+            }
+            assert!(stack.is_empty());
+        }
+
+        // reverse so that return value is immediately a topological ordering
+        sccs.reverse();
+        sccs
+    }
+
+    fn sccs_to_dag(n: usize, adj: &Vec<Vec<usize>>, comps: &Vec<Vec<usize>>) {
+        let mut repr_to_comp = HashMap::with_capacity(comps.len());
+        let mut comp_to_repr = HashMap::with_capacity(n);
+
+        for comp in comps {
+            let repr = *comp.get(0).unwrap();
+
+            repr_to_comp.insert(repr, comp);
+            for v in comp {
+                comp_to_repr.insert(*v, repr);
+            }
+        }
+        let mut comp_adj = vec![Vec::new(); n];
+        for v in 0..n {
+            let repr_v = *comp_to_repr.get(&v).unwrap();
+
+            for neighbor in &adj[v] {
+                let repr_neighbor = *comp_to_repr.get(&neighbor).unwrap();
+
+                if repr_neighbor != repr_v {
+                    comp_adj[repr_v].push(repr_neighbor);
+                }
+            }
+        }
+    }
+
+    fn dfs(
+        start: usize,
+        adj: &Vec<Vec<usize>>,
+        dfs_counter: &mut i64,
+        dfs_num: &mut Vec<i64>,
+        dfs_min: &mut Vec<i64>,
+        dfs_parent: &mut Vec<i64>,
+        sccs: &mut Vec<Vec<usize>>,
+        stack: &mut Vec<usize>,
+    ) {
+        dfs_min[start] = *dfs_counter;
+        dfs_num[start] = *dfs_counter;
+        *dfs_counter += 1;
+
+        stack.push(start);
+        let stackpos = stack.len() - 1;
+
+        for &neighbor in &adj[start] {
+            if dfs_num[neighbor] == UNVISITED {
+                // tree edge
+
+                dfs(
+                    neighbor,
+                    adj,
+                    dfs_counter,
+                    dfs_num,
+                    dfs_min,
+                    dfs_parent,
+                    sccs,
+                    stack,
+                );
+
+                dfs_min[start] = min(dfs_min[start], dfs_min[neighbor]);
+            } else if stack.contains(&neighbor) {
+                // back edge
+                dfs_min[start] = min(dfs_min[start], dfs_num[neighbor]);
+            }
+        }
+
+        // when backtracking, check if dfs_num == dfs_min, in which case we have a scc.
+        if dfs_min[start] == dfs_num[start] {
+            let scc = stack.drain(stackpos..stack.len()).collect();
+            sccs.push(scc);
+        }
+    }
+}
+
+mod dag {
+    use super::*;
+
+    /// shortest path from sources, but can be used for apsp by subtracting
+    /// also possible: longest path, counting paths
+    fn sssp(adj: &Vec<Vec<(usize, u64)>>, ts: &Vec<usize>) -> Vec<u64> {
+        let n = adj.len();
+        let mut dist = vec![u64::MAX; n];
+
+        for &v in ts {
+            for &(neighbor, w) in &adj[v] {
+                dist[neighbor] = min(dist[neighbor], dist[v] + w);
+            }
+        }
+
+        dist
+    }
+}
+
+/// Eulerian trail, 0 or 2 vertices have odd degree (the start and end). All others have even degree.
+/// We also check if all edges belong to one component, i.e. all vertices not in that component have 0 edges between them.
+mod euler {
+    use std::{
+        cmp::{max, min, Ordering},
+        collections::{HashMap, HashSet, VecDeque},
+        io::{self, Read},
+    };
+
+    fn main() {
+        let mut input = String::new();
+        io::stdin().read_to_string(&mut input).unwrap();
+
+        let mut tokens = input.split_ascii_whitespace();
+        macro_rules! next_token {
+            ( $t:ty ) => {
+                tokens.next().unwrap().parse::<$t>().unwrap()
+            };
+        }
+
+        let n = next_token!(usize);
+        let m = next_token!(usize);
+
+        let mut adj = vec![Vec::new(); n];
+        let mut indeg = vec![0usize; n];
+
+        for _ in 0..m {
+            let start = next_token!(usize);
+            let end = next_token!(usize);
+
+            adj[start - 1].push(end - 1);
+            indeg[end - 1] += 1;
+        }
+
+        // check in/out-degree of all vertices
+        let mut euler_possible = true;
+        for i in 0..n {
+            if i == 0 {
+                if adj[i].len() != indeg[i] + 1 {
+                    euler_possible = false;
+                    break;
+                }
+            } else if i == n - 1 {
+                if adj[i].len() != indeg[i] - 1 {
+                    euler_possible = false;
+                    break;
+                }
+            } else if adj[i].len() != indeg[i] {
+                euler_possible = false;
+                break;
+            }
+        }
+
+        if euler_possible {
+            // try to walk the cycle, if at end and not all nodes are visited, we have a separate component;
+            let mut visited = vec![false; n];
+            dfs_rec(&adj, &mut visited, 0);
+
+            // vertices with nonzero degree are allowed belong to other component
+            let all_visited = visited
+                .iter()
+                .enumerate()
+                .all(|(i, &is_visited)| is_visited || (adj[i].len() == 0 && indeg[i] == 0));
+            if !all_visited {
+                println!("impossible");
+            } else {
+                println!("possible");
+            }
+        } else {
+            println!("impossible");
+        }
+    }
+
+    fn dfs_rec(adj: &Vec<Vec<usize>>, visited: &mut Vec<bool>, start: usize) {
+        visited[start] = true;
+
+        for neighbor in &adj[start] {
+            if !visited[*neighbor] {
+                dfs_rec(adj, visited, *neighbor);
+            }
+        }
+    }
+
+    // NOTE: cycle is reversed
+    // for connected graph, cycle.len() == adj.len() + 1
+    fn euler_cycle(adj: &mut Vec<Vec<usize>>, cycle: &mut Vec<usize>, start: usize) {
+        if let Some(neighbor) = adj[start].pop() {
+            euler_cycle(adj, cycle, neighbor);
+            assert!(adj[start].is_empty());
+        }
+
+        cycle.push(start);
     }
 }
 
