@@ -87,13 +87,13 @@ fn diverge() {
 }
 
 fn is_in_order<T: Ord>(s: &Vec<T>) -> bool {
-    if let Some(mut last) = s.get(0) {
+    if let Some(mut prev) = s.get(0) {
         for x in s {
-            if x < last {
+            if x < prev {
                 return false;
             }
 
-            last = x;
+            prev = x;
         }
     }
 
@@ -177,6 +177,7 @@ mod permutation {
 }
 
 /// return a mapping [sum |-> count] of all subset sums of the given vector.
+/// for meet in the middle
 fn subset_sums(v: Vec<i64>) -> HashMap<i64, i64> {
     assert!(v.len() <= 64);
 
@@ -230,6 +231,7 @@ fn lis() {
 fn lis_binary() {
     // let mut A: Vec<i64> = Vec::with_capacity(n);
     // let mut g = Vec::new();
+    // g(l) := smallest a s.t. exists increasing subseq with length l
     // g.push(i64::MIN);
 
     // let mut dp = Vec::with_capacity(n);
@@ -468,16 +470,12 @@ fn dfs(adj: &Vec<Vec<usize>>, start: usize) -> Vec<bool> {
     visited
 }
 
-fn dfs_rec(adj: &Vec<Vec<usize>>, visited: &mut Vec<bool>, start: usize, max_depth: u64) {
+fn dfs_rec(adj: &Vec<Vec<usize>>, visited: &mut Vec<bool>, start: usize) {
     visited[start] = true;
-
-    if max_depth == 0 {
-        return;
-    }
 
     for neighbor in &adj[start] {
         if !visited[*neighbor] {
-            dfs_rec(adj, visited, *neighbor, max_depth - 1);
+            dfs_rec(adj, visited, *neighbor);
         }
     }
 }

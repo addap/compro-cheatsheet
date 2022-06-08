@@ -87,13 +87,13 @@ fn diverge() {
 }
 
 fn is_in_order<T: Ord>(s: &Vec<T>) -> bool {
-    if let Some(mut last) = s.get(0) {
+    if let Some(mut prev) = s.get(0) {
         for x in s {
-            if x < last {
+            if x < prev {
                 return false;
             }
 
-            last = x;
+            prev = x;
         }
     }
 
@@ -177,6 +177,7 @@ mod permutation {
 }
 
 /// return a mapping [sum |-> count] of all subset sums of the given vector.
+/// for meet in the middle
 fn subset_sums(v: Vec<i64>) -> HashMap<i64, i64> {
     assert!(v.len() <= 64);
 
@@ -230,6 +231,7 @@ fn lis() {
 fn lis_binary() {
     // let mut A: Vec<i64> = Vec::with_capacity(n);
     // let mut g = Vec::new();
+    // g(l) := smallest a s.t. exists increasing subseq with length l
     // g.push(i64::MIN);
 
     // let mut dp = Vec::with_capacity(n);
@@ -468,16 +470,12 @@ fn dfs(adj: &Vec<Vec<usize>>, start: usize) -> Vec<bool> {
     visited
 }
 
-fn dfs_rec(adj: &Vec<Vec<usize>>, visited: &mut Vec<bool>, start: usize, max_depth: u64) {
+fn dfs_rec(adj: &Vec<Vec<usize>>, visited: &mut Vec<bool>, start: usize) {
     visited[start] = true;
-
-    if max_depth == 0 {
-        return;
-    }
 
     for neighbor in &adj[start] {
         if !visited[*neighbor] {
-            dfs_rec(adj, visited, *neighbor, max_depth - 1);
+            dfs_rec(adj, visited, *neighbor);
         }
     }
 }
@@ -1221,22 +1219,18 @@ mod querying {
         }
     }
 }
-## Credentials
-user: team4966
-pw: bolaxi76
-
 ## Tests
 cargo run --bin XXX < ./testfile.in
 
 ## SSSP
 single source shortest path
 
-| | BFS     | Dijkstra          | Bellman-Ford          | Flo✓d Warshall    |
+|                | BFS     | Dijkstra          | Bellman-Ford          | Flo✓d Warshall    |
 |-|-|-|-|-|
-| Running Time | O(V+E) | O((V+E)\*log V) | O(VE) | O(V^3) |
-| Max Size | V, E <= 10^7 | V, E <= 10^6 | V * E <= 10^7 | V <= 500 |
-| Unweighted | ✓ | ✓ | ✓ | ✓ |
-| Weighted | ✗ | ✓ | ✓ | ✓ |
-| Negative Weights | ✗ | ✗ | ✓ | ✓ |
+| Running Time   | O(V+E) | O((V+E)\*log V) | O(VE) | O(V^3) |
+| Max Size       | V, E <= 10^7 | V, E <= 10^6 | V * E <= 10^7 | V <= 500 |
+| Unweighted     | ✓ | ✓ | ✓ | ✓ |
+| Weighted       | ✗ | ✓ | ✓ | ✓ |
+| Neg Weights    | ✗ | ✗ | ✓ | ✓ |
 | Sparse (E ~ V) | O(V) | O(V*log V) | O(V^2) | O(V^3) |
-| Dense (E ~ V^2) | O(V^2) | O(V^2 * log V) | O(V^3) | O(V^3) |
+| Dense (E ~ V^2)| O(V^2) | O(V^2 * log V) | O(V^3) | O(V^3) |
