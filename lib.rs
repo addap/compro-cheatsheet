@@ -25,7 +25,7 @@ fn linize() {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input).unwrap();
 
-    let lines = input.split_terminator('\n');
+    let mut lines = input.split_terminator('\n');
 }
 
 /// Dichten Graph mit Adjazenzmatrix lesen
@@ -1216,6 +1216,55 @@ mod querying {
                 }
                 _ => unreachable!(),
             }
+        }
+    }
+}
+
+mod union_find {
+    type N = usize;
+
+    pub struct UnionFind {
+        pub parent: Vec<N>,
+        pub rank: Vec<N>,
+    }
+
+    impl UnionFind {
+        pub fn new(n: usize) -> Self {
+            Self {
+                parent: (0..n).collect(),
+                rank: vec![0; n],
+            }
+        }
+
+        pub fn union_set(&mut self, i: usize, j: usize) {
+            //
+            let i = self.find_set(i);
+            let j = self.find_set(j);
+
+            if i != j {
+                if self.rank[i] > self.rank[j] {
+                    self.parent[j] = i;
+                } else {
+                    self.parent[i] = j;
+                    if self.rank[i] == self.rank[j] {
+                        self.rank[j] += 1;
+                    }
+                }
+            }
+        }
+
+        pub fn find_set(&mut self, i: usize) -> usize {
+            if self.parent[i] == i {
+                return i;
+            } else {
+                let representant = self.find_set(self.parent[i]);
+                self.parent[i] = representant;
+                return representant;
+            }
+        }
+
+        pub fn is_same_set(&mut self, i: usize, j: usize) -> bool {
+            self.find_set(i) == self.find_set(j)
         }
     }
 }
