@@ -1309,3 +1309,61 @@ mod lca_binarylift {
         }
     }
 }
+
+mod unionfind {
+
+    struct UnionFind {
+        parent: Vec<usize>,
+        rank: Vec<usize>,
+    }
+
+    impl UnionFind {
+        fn new(n: usize) -> UnionFind {
+            UnionFind {
+                parent: (0..n).collect(),
+                rank: vec![0; n],
+            }
+        }
+        fn find(&mut self, x: usize) -> usize {
+            if self.parent[x] == x {
+                return x;
+            } else {
+                self.parent[x] = self.find(self.parent[x]);
+                return self.parent[x];
+            }
+        }
+
+        fn union(&mut self, x1: usize, x2: usize) {
+            let i = self.find(x1);
+            let j = self.find(x2);
+            if i != j {
+                if self.rank[i] > self.rank[j] {
+                    self.parent[j] = i;
+                } else {
+                    self.parent[i] = j;
+                    if self.rank[i] == self.rank[j] {
+                        self.rank[j] += 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/*
+## Tests
+cargo run --bin XXX < ./testfile.in
+
+## SSSP
+single source shortest path
+
+|                | BFS     | Dijkstra          | Bellman-Ford          | Flo✓d Warshall    |
+|-|-|-|-|-|
+| Running Time   | O(V+E) | O((V+E)\*log V) | O(VE) | O(V^3) |
+| Max Size       | V, E <= 10^7 | V, E <= 10^6 | V * E <= 10^7 | V <= 500 |
+| Unweighted     | ✓ | ✓ | ✓ | ✓ |
+| Weighted       | ✗ | ✓ | ✓ | ✓ |
+| Neg Weights    | ✗ | ✗ | ✓ | ✓ |
+| Sparse (E ~ V) | O(V) | O(V*log V) | O(V^2) | O(V^3) |
+| Dense (E ~ V^2)| O(V^2) | O(V^2 * log V) | O(V^3) | O(V^3) |
+*/
