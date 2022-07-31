@@ -1312,19 +1312,19 @@ mod lca_binarylift {
 
 mod unionfind {
 
-    struct UnionFind {
-        parent: Vec<usize>,
+    pub struct UnionFind {
+        pub parent: Vec<usize>,
         rank: Vec<usize>,
     }
 
     impl UnionFind {
-        fn new(n: usize) -> UnionFind {
+        pub fn new(n: usize) -> UnionFind {
             UnionFind {
                 parent: (0..n).collect(),
                 rank: vec![0; n],
             }
         }
-        fn find(&mut self, x: usize) -> usize {
+        pub fn find(&mut self, x: usize) -> usize {
             if self.parent[x] == x {
                 return x;
             } else {
@@ -1333,7 +1333,7 @@ mod unionfind {
             }
         }
 
-        fn union(&mut self, x1: usize, x2: usize) {
+        pub fn union(&mut self, x1: usize, x2: usize) {
             let i = self.find(x1);
             let j = self.find(x2);
             if i != j {
@@ -1348,6 +1348,28 @@ mod unionfind {
             }
         }
     }
+}
+
+// calculates the MST (minimum spanning tree) in O(N*Log(N)). Graph given as edge list.
+// Returns the edges that are part of MST (the resulting set is symmetric since undirected edges are considered)
+// After the algorithm, the input edges are sorted
+fn kruskal_minimum_spanning_tree(
+    num_nodes: usize,
+    weighted_edges: &mut Vec<(usize, usize, i64)>,
+) -> HashSet<(usize, usize)> {
+    let mut uf = unionfind::UnionFind::new(num_nodes);
+    let mut mst = HashSet::new();
+    weighted_edges.sort_by_key(|(_, _, v)| *v);
+    for &(s, d, _) in weighted_edges.iter() {
+        if uf.find(s) != uf.find(d) {
+            uf.union(s, d);
+
+            mst.insert((s, d));
+            mst.insert((d, s));
+        }
+    }
+
+    mst
 }
 
 /*
