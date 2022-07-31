@@ -1219,3 +1219,93 @@ mod querying {
         }
     }
 }
+
+mod lca_binarylift {
+    //////////////////
+    /// Usage: Get the tree as adjacency list (directed edges towards children only), n (num nodes), root node
+    /// Call precompute
+    /// Call lca
+    /// Profit
+    /// //////////////
+
+    //      node        adj-list                  height/depth        immediate parent
+    fn dfs(u: usize, graph: &Vec<Vec<usize>>, h: &mut Vec<usize>, p: &mut Vec<usize>) {
+        for &v in &graph[u] {
+            if v != p[u] {
+                p[v] = u;
+                h[v] = h[u] + 1;
+                dfs(v, graph, h, p);
+            }
+        }
+    }
+
+    pub struct Lca {
+        pub graph: Vec<Vec<usize>>,
+        // height such that the root has height 0
+        pub h: Vec<usize>,
+        // p[i][u] == 2^i-th ancestor of u; p[0][u] is the immediate parent of u
+        pub p: Vec<Vec<usize>>,
+    }
+
+    impl Lca {
+        // kth ancestor of node "u", 0th ancestor is u itself, 1st is direct parent etc
+        pub fn kth_ancestor(&self, u: usize, mut k: usize) -> usize {
+            let mut res = u;
+            // do binary lifting: decompose k into a binary string; for each 1 in it, we know the parent
+            for i in (0..(self.p.len())).rev() {
+                if k >= (1 << i) {
+                    // k has the "i"th one
+                    k -= (1 << i);
+                    res = self.p[i][res];
+                }
+            }
+            res
+        }
+
+        // O(N* log(N))
+        // n == number of nodes in graph
+        // graph == adj. list
+        pub fn precompute(n: usize, root: usize, graph: Vec<Vec<usize>>) -> Lca {
+            let l = ((graph.len() as f64).log2().ceil() as usize) + 1;
+            // depths
+            let mut h: Vec<usize> = vec![0; n];
+            let mut p: Vec<Vec<usize>> = vec![vec![0; n]; l];
+            p[0][root] = root;
+            // fill depths and immediate parents
+            dfs(root, &graph, &mut h, &mut p[0]);
+
+            for i in 1..l {
+                for j in 0..n {
+                    // for example, the 8th parent == 4th parent of the 4th parent
+                    p[i][j] = p[i - 1][p[i - 1][j]];
+                }
+            }
+
+            Lca { graph, h, p }
+        }
+
+        // O(log(N))
+        pub fn lca(&self, mut u: usize, mut v: usize) -> usize {
+            if self.h[v] > self.h[u] {
+                std::mem::swap(&mut u, &mut v);
+            }
+
+            // lift u to the level of v
+            u = self.kth_ancestor(u, self.h[u] - self.h[v]);
+            if u == v {
+                // v is some ancestor of u, so their lca is v
+                return v;
+            }
+
+            // do binary lifting, jump as much as possible such that u and v are still in separate branches
+            for i in (0..(self.p.len())).rev() {
+                if self.p[i][u] != self.p[i][v] {
+                    u = self.p[i][u];
+                    v = self.p[i][v];
+                }
+            }
+
+            self.p[0][u]
+        }
+    }
+}
