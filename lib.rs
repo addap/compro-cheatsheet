@@ -1952,65 +1952,390 @@ mod trie {
 }
 
 mod maxflow {
+    //! edmonds-karp algorithm
+    //! runtime O(V * E^2)
+    //! does not matter if 0 or 1 based
 
-    // edmonson-karp algorithm
-    // runtime O(V * E^2)
-    const UNVISITED: usize = usize::MAX;
-    fn maxflow(adj: &Vec<Vec<usize>>, capacity: &mut Vec<Vec<i64>>, s: usize, t: usize) -> i64 {
-        //
-        let n = adj.len();
-        let mut totalflow = 0;
+    // maxflow always uses directed capacities. For undirected capacities, insert the same capacity fowards and backwards in the capacity map.
+    mod undirected {
+        use std::{
+            cmp::{max, min, Ordering},
+            collections::{HashMap, HashSet, VecDeque},
+            io::{self, Read},
+        };
 
-        loop {
-            let parent = bfs(adj, capacity, s);
-            if parent[t] == UNVISITED {
-                // t unreachable
-                break;
+        fn main() {
+            let mut input = String::new();
+            io::stdin().read_to_string(&mut input).unwrap();
+
+            let mut tokens = input.split_ascii_whitespace();
+            macro_rules! next_token {
+                ( $t:ty ) => {
+                    tokens.next().unwrap().parse::<$t>().unwrap()
+                };
             }
 
-            let mut bottleneck = i64::MAX;
-            let mut u = t;
-            while u != s {
-                let v = parent[u];
-                bottleneck = min(bottleneck, capacity[v][u]);
-                u = v;
-            }
+            let t = next_token!(usize);
 
-            u = t;
-            while u != s {
-                let v = parent[u];
-                capacity[v][u] -= bottleneck;
-                capacity[u][v] += bottleneck;
-                u = v;
-            }
-            totalflow += bottleneck;
-        }
+            for tc in 0..t {
+                let l = next_token!(i64);
+                let n = next_token!(usize);
+                let m = next_token!(usize);
 
-        totalflow
-    }
+                let mut adj = vec![Vec::with_capacity(n); n];
+                let mut capacity = vec![vec![0; n]; n];
 
-    fn bfs(
-        adj: &Vec<Vec<usize>>,
-        capacity: &Vec<Vec<i64>>,
-        s: usize,
-        // parent: &mut Vec<usize>,
-    ) -> Vec<usize> {
-        let n = adj.len();
-        let mut parent = vec![UNVISITED; n];
-        parent[s] = s;
+                for _ in 0..m {
+                    let i = next_token!(usize) - 1;
+                    let j = next_token!(usize) - 1;
+                    let k = next_token!(i64);
 
-        let mut q = VecDeque::with_capacity(n);
-        q.push_back(s);
+                    adj[i].push(j);
+                    adj[j].push(i);
+                    capacity[i][j] += k;
+                    capacity[j][i] += k;
+                }
 
-        while let Some(u) = q.pop_front() {
-            for &v in &adj[u] {
-                if parent[v] == UNVISITED && capacity[u][v] > 0 {
-                    q.push_back(v);
-                    parent[v] = u;
+                let out = maxflow(&adj, &mut capacity, 0, n - 1);
+                if out <= l {
+                    println!("Case #{}: yes", tc + 1)
+                } else {
+                    println!("Case #{}: no", tc + 1)
                 }
             }
         }
-        parent
+
+        const UNVISITED: usize = usize::MAX;
+        fn maxflow(adj: &Vec<Vec<usize>>, capacity: &mut Vec<Vec<i64>>, s: usize, t: usize) -> i64 {
+            //
+            let n = adj.len();
+            let mut totalflow = 0;
+
+            loop {
+                let parent = bfs(adj, capacity, s);
+                if parent[t] == UNVISITED {
+                    // t unreachable
+                    break;
+                }
+
+                let mut bottleneck = i64::MAX;
+                let mut u = t;
+                while u != s {
+                    let v = parent[u];
+                    bottleneck = min(bottleneck, capacity[v][u]);
+                    u = v;
+                }
+
+                u = t;
+                while u != s {
+                    let v = parent[u];
+                    capacity[v][u] -= bottleneck;
+                    capacity[u][v] += bottleneck;
+                    u = v;
+                }
+                totalflow += bottleneck;
+            }
+
+            totalflow
+        }
+
+        fn bfs(
+            adj: &Vec<Vec<usize>>,
+            capacity: &Vec<Vec<i64>>,
+            s: usize,
+            // parent: &mut Vec<usize>,
+        ) -> Vec<usize> {
+            let n = adj.len();
+            let mut parent = vec![UNVISITED; n];
+            parent[s] = s;
+
+            let mut q = VecDeque::with_capacity(n);
+            q.push_back(s);
+
+            while let Some(u) = q.pop_front() {
+                for &v in &adj[u] {
+                    if parent[v] == UNVISITED && capacity[u][v] > 0 {
+                        q.push_back(v);
+                        parent[v] = u;
+                    }
+                }
+            }
+            parent
+        }
+    }
+
+    // normal maxflow with directed capacity
+    mod directed {
+        use std::{
+            cmp::{max, min, Ordering},
+            collections::{HashMap, HashSet, VecDeque},
+            io::{self, Read},
+        };
+
+        /// ---------- READING INPUT ------------
+
+        /// next_token() Makro um whitespace-separated Zeug zu lesen
+        fn main() {
+            let mut input = String::new();
+            io::stdin().read_to_string(&mut input).unwrap();
+
+            let mut tokens = input.split_ascii_whitespace();
+            macro_rules! next_token {
+                ( $t:ty ) => {
+                    tokens.next().unwrap().parse::<$t>().unwrap()
+                };
+            }
+
+            let n = next_token!(usize);
+            let super_n = 2 * n + 2;
+
+            let mut capacity = vec![vec![0; super_n]; super_n];
+            let mut adj = vec![Vec::with_capacity(super_n); super_n];
+
+            for u in 2..n + 2 {
+                for v in n + 2..super_n {
+                    if next_token!(u8) == 1 {
+                        adj[v].push(u);
+                        adj[u].push(v);
+                        capacity[u][v] += 1;
+                    }
+                }
+
+                adj[0].push(u);
+                capacity[0][u] = 1;
+            }
+
+            for v in n + 2..super_n {
+                adj[v].push(1);
+                capacity[v][1] = 1;
+            }
+
+            let out = maxflow(&adj, &mut capacity, 0, 1);
+
+            println!("{}", out);
+        }
+
+        const UNVISITED: usize = usize::MAX;
+        fn maxflow(adj: &Vec<Vec<usize>>, capacity: &mut Vec<Vec<i64>>, s: usize, t: usize) -> i64 {
+            //
+            let n = adj.len();
+            let mut totalflow = 0;
+
+            loop {
+                let parent = bfs(adj, capacity, s);
+                if parent[t] == UNVISITED {
+                    // t unreachable
+                    break;
+                }
+
+                let mut bottleneck = i64::MAX;
+                let mut u = t;
+                while u != s {
+                    let v = parent[u];
+                    bottleneck = min(bottleneck, capacity[v][u]);
+                    u = v;
+                }
+
+                u = t;
+                while u != s {
+                    let v = parent[u];
+                    capacity[v][u] -= bottleneck;
+                    capacity[u][v] += bottleneck;
+                    u = v;
+                }
+                totalflow += bottleneck;
+            }
+
+            totalflow
+        }
+
+        fn bfs(
+            adj: &Vec<Vec<usize>>,
+            capacity: &Vec<Vec<i64>>,
+            s: usize,
+            // parent: &mut Vec<usize>,
+        ) -> Vec<usize> {
+            let n = adj.len();
+            let mut parent = vec![UNVISITED; n];
+            parent[s] = s;
+
+            let mut q = VecDeque::with_capacity(n);
+            q.push_back(s);
+
+            while let Some(u) = q.pop_front() {
+                for &v in &adj[u] {
+                    if parent[v] == UNVISITED && capacity[u][v] > 0 {
+                        q.push_back(v);
+                        parent[v] = u;
+                    }
+                }
+            }
+            parent
+        }
+    }
+
+    // maxflow with super-source/sink and inner capacities
+    // super source & sink are new nodes that you have to connect to everything else
+    mod super_inner {
+        use std::{
+            cmp::{max, min, Ordering},
+            collections::{HashMap, HashSet, VecDeque},
+            io::{self, Read},
+        };
+
+        fn main() {
+            let mut input = String::new();
+            io::stdin().read_to_string(&mut input).unwrap();
+
+            let mut tokens = input.split_ascii_whitespace();
+            macro_rules! next_token {
+                ( $t:ty ) => {
+                    tokens.next().unwrap().parse::<$t>().unwrap()
+                };
+            }
+
+            let tests = next_token!(usize);
+
+            for t in 1..=tests {
+                let w = next_token!(usize);
+                let h = next_token!(usize);
+                let n = w * h;
+                let super_n = 2 * n + 2;
+                let source = 2 * n;
+                let sink = 2 * n + 1;
+
+                let mut map = Vec::with_capacity(h);
+
+                let mut adj = vec![Vec::with_capacity(5); super_n];
+                let mut capacity = vec![vec![0; super_n]; super_n];
+
+                for _ in 0..h {
+                    map.push(tokens.next().unwrap().as_bytes());
+                }
+
+                for y in 0..h {
+                    for x in 0..w {
+                        let v_start = y * w + x;
+                        let v_right_start = v_start + 1;
+                        let v_down_start = v_start + w;
+                        let v_end = v_start + n;
+                        let v_right_end = v_right_start + n;
+                        let v_down_end = v_down_start + n;
+
+                        // interior connection
+                        adj[v_start].push(v_end);
+                        adj[v_end].push(v_start);
+                        capacity[v_start][v_end] = 1;
+
+                        match map[y][x] {
+                            b'W' => {
+                                adj[source].push(v_start);
+                                capacity[source][v_start] = 1;
+                            }
+                            b'I' => {}
+                            b'N' => {
+                                adj[v_end].push(sink);
+                                capacity[v_end][sink] = 1;
+                            }
+                            _ => unreachable!("unknown char"),
+                        }
+
+                        if x < w - 1 {
+                            match (map[y][x], map[y][x + 1]) {
+                                (b'W', b'I') | (b'I', b'N') => {
+                                    adj[v_end].push(v_right_start);
+                                    adj[v_right_start].push(v_end);
+                                    capacity[v_end][v_right_start] = 1;
+                                }
+                                (b'I', b'W') | (b'N', b'I') => {
+                                    adj[v_right_end].push(v_start);
+                                    adj[v_start].push(v_right_end);
+                                    capacity[v_right_end][v_start] = 1;
+                                }
+                                _ => {}
+                            }
+                        }
+                        if y < h - 1 {
+                            match (map[y][x], map[y + 1][x]) {
+                                (b'W', b'I') | (b'I', b'N') => {
+                                    adj[v_end].push(v_down_start);
+                                    adj[v_down_start].push(v_end);
+                                    capacity[v_end][v_down_start] = 1;
+                                }
+                                (b'I', b'W') | (b'N', b'I') => {
+                                    adj[v_down_end].push(v_start);
+                                    adj[v_start].push(v_down_end);
+                                    capacity[v_down_end][v_start] = 1;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+
+                let out = maxflow(&adj, &mut capacity, source, sink);
+
+                println!("Case #{}: {}", t, out);
+            }
+        }
+
+        const UNVISITED: usize = usize::MAX;
+        fn maxflow(adj: &Vec<Vec<usize>>, capacity: &mut Vec<Vec<i64>>, s: usize, t: usize) -> i64 {
+            //
+            let n = adj.len();
+            let mut totalflow = 0;
+
+            loop {
+                let parent = bfs(adj, capacity, s);
+                if parent[t] == UNVISITED {
+                    // t unreachable
+                    break;
+                }
+
+                let mut bottleneck = i64::MAX;
+                let mut u = t;
+                while u != s {
+                    let v = parent[u];
+                    bottleneck = min(bottleneck, capacity[v][u]);
+                    u = v;
+                }
+
+                u = t;
+                while u != s {
+                    let v = parent[u];
+                    capacity[v][u] -= bottleneck;
+                    capacity[u][v] += bottleneck;
+                    u = v;
+                }
+                totalflow += bottleneck;
+            }
+
+            totalflow
+        }
+
+        fn bfs(
+            adj: &Vec<Vec<usize>>,
+            capacity: &Vec<Vec<i64>>,
+            s: usize,
+            // parent: &mut Vec<usize>,
+        ) -> Vec<usize> {
+            let n = adj.len();
+            let mut parent = vec![UNVISITED; n];
+            parent[s] = s;
+
+            let mut q = VecDeque::with_capacity(n);
+            q.push_back(s);
+
+            while let Some(u) = q.pop_front() {
+                for &v in &adj[u] {
+                    if parent[v] == UNVISITED && capacity[u][v] > 0 {
+                        q.push_back(v);
+                        parent[v] = u;
+                    }
+                }
+            }
+            parent
+        }
     }
 }
 /*
