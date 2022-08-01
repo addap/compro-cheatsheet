@@ -1485,6 +1485,41 @@ mod mathstuff {
 
         (x2, y2, b)
     }
+
+    fn fexp(n: usize, k: usize, p: usize) -> usize {
+        if k == 0 {
+            return 1;
+        } else if k % 2 == 0 {
+            let r = fexp(n, k / 2, p);
+            return (r * r) % p;
+        } else {
+            return (n * fexp(n, k - 1, p)) % p;
+        }
+    }
+
+    fn modinv(n: usize, p: usize) -> usize {
+        fexp(n, p - 2, p)
+    }
+
+    fn fac_modp(n: usize, p: usize) -> usize {
+        let mut res = 1;
+        for i in 2..=n {
+            res = (res * i) % p;
+        }
+        res
+    }
+
+    fn binom_modp(n: usize, mut k: usize, p: usize) -> usize {
+        // we absolutely need to make sure that k <= (n/2)
+        if 2 * k > n {
+            k = n - k;
+        }
+        let mut res = 1;
+        for i in (n - k + 1)..=n {
+            res = (res * i) % p;
+        }
+        (res * modinv(fac_modp(k, p), p)) % p
+    }
 }
 
 /*
