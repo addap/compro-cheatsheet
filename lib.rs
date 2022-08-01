@@ -2338,6 +2338,150 @@ mod maxflow {
         }
     }
 }
+
+mod segtree_pointupdate_rangequery {
+    use std::{
+        io::{self, Read},
+        mem::swap,
+    };
+
+    //TODO: Impl FUpdate
+
+    mod segment_tree {
+
+        // NOTE: This implmentation is enough to query a range of say 10^6. If more => use coordinate compression
+        // Point Update: O(logn)
+        // Range Query: O(logn)
+        pub struct SegTree<T: Copy, FQuery: Fn(T, T) -> T> {
+            values: Vec<T>,
+            size: usize,
+            query_neutral_element: T,
+            query_op: FQuery,
+        }
+
+        fn parent(i: usize) -> usize {
+            i / 2
+        }
+        fn left(i: usize) -> usize {
+            2 * i
+        }
+        fn right(i: usize) -> usize {
+            2 * i + 1
+        }
+
+        impl<T: Copy, FQuery: Fn(T, T) -> T> SegTree<T, FQuery> {
+            // propagate up
+            fn propagate(&mut self, i: usize) {
+                self.values[i] = (self.query_op)(self.values[left(i)], self.values[right(i)]);
+                if i > 1 {
+                    // a leaf, bubble up
+                    self.propagate(parent(i));
+                }
+            }
+
+            fn query_impl(&self, i: usize, j: usize, l: usize, r: usize, current_node: usize) -> T {
+                if r <= i || j <= l {
+                    return self.query_neutral_element;
+                }
+                if r <= j && i <= l {
+                    // current interval is a subset of the query, so return it all
+                    return self.values[current_node];
+                }
+
+                let m = (l + r) / 2;
+                (self.query_op)(
+                    self.query_impl(i, j, l, m, left(current_node)),
+                    self.query_impl(i, j, m, r, right(current_node)),
+                )
+            }
+
+            pub fn query(&self, i: usize, j: usize) -> T {
+                self.query_impl(i, j, 0, self.size, 1)
+            }
+
+            pub fn update(&mut self, i: usize, val: T) {
+                self.values[i + self.size] = val;
+                self.propagate(parent(i + self.size));
+            }
+
+            // Important: "initial" vector is not necessarily 1 based
+            pub fn new(
+                initial: Vec<T>,
+                query_neutral_element: T,
+                query_op: FQuery,
+            ) -> SegTree<T, FQuery> {
+                let size = 1 << ((initial.len() as f64).log2().ceil() as usize);
+                let mut values = vec![query_neutral_element; 2 * size];
+                for i in 0..initial.len() {
+                    values[i + size] = initial[i];
+                }
+                for i in (1..size).rev() {
+                    values[i] = query_op(values[left(i)], values[right(i)]);
+                }
+
+                SegTree {
+                    values,
+                    size,
+                    query_neutral_element,
+                    query_op,
+                }
+            }
+
+            pub fn get_inner(&self) -> &[T] {
+                &self.values[self.size..]
+            }
+        }
+    }
+
+    fn gcd(mut a: usize, mut b: usize) -> usize {
+        if a < b {
+            swap(&mut a, &mut b);
+        }
+        if b == 0 {
+            return a;
+        }
+        let r = a % b;
+        gcd(b, r)
+    }
+
+    fn main() {
+        let mut buffer = String::new();
+        io::stdin().read_to_string(&mut buffer).unwrap();
+        let mut iter = buffer.split_whitespace();
+
+        let N: usize = iter.next().unwrap().parse().unwrap();
+        let Q: usize = iter.next().unwrap().parse().unwrap();
+
+        let mut v = vec![0; N];
+
+        for i in 0..N {
+            let val: usize = iter.next().unwrap().parse().unwrap();
+            v[i] = val;
+        }
+
+        let mut st = segment_tree::SegTree::new(v, 0, gcd);
+        for _ in 0..Q {
+            let op = iter.next().unwrap().to_string().bytes().next().unwrap();
+
+            if op == b'!' {
+                let mut i: usize = iter.next().unwrap().parse().unwrap();
+                i -= 1;
+                let val: usize = iter.next().unwrap().parse().unwrap();
+
+                st.update(i, val);
+            }
+            if op == b'?' {
+                let mut i: usize = iter.next().unwrap().parse().unwrap();
+                let mut j: usize = iter.next().unwrap().parse().unwrap();
+                i -= 1;
+                j -= 1;
+
+                println!("{}", st.query(i, j + 1));
+            }
+        }
+    }
+}
+
 /*
 
 ## Input sizes
