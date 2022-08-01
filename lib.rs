@@ -1709,6 +1709,7 @@ mod kmp {
 }
 
 mod edit_distance {
+    use super::*;
 
     // The edit (Levenstein) distance of two strings
 
@@ -2482,6 +2483,97 @@ mod segtree_pointupdate_rangequery {
     }
 }
 
+mod segtree_rangeupdate_pointquery {
+    use super::*;
+
+    mod segment_tree {
+
+        // NOTE: This implmentation is enough to query a range of say 10^6. If more => use coordinate compression
+        // Point Update: O(logn)
+        // Range Query: O(logn)
+        pub struct SegTree<T: Copy, FQuery: Fn(T, T) -> T> {
+            values: Vec<T>,
+            size: usize,
+            query_neutral_element: T,
+            query_op: FQuery,
+        }
+
+        fn parent(i: usize) -> usize {
+            i / 2
+        }
+        fn left(i: usize) -> usize {
+            2 * i
+        }
+        fn right(i: usize) -> usize {
+            2 * i + 1
+        }
+
+        impl<T: Copy, FQuery: Fn(T, T) -> T> SegTree<T, FQuery> {
+            pub fn query(&self, i: usize) -> T {
+                let mut current_node = i + self.size;
+                let mut ret = self.values[current_node];
+
+                while current_node > 1 {
+                    current_node = parent(current_node);
+                    ret = (self.query_op)(ret, self.values[i]);
+                }
+
+                return ret;
+            }
+
+            pub fn update(&mut self, i: usize, j: usize, val: T) {
+                self.update_impl(i, j, 0, self.size, 1, val);
+            }
+
+            fn update_impl(
+                &mut self,
+                i: usize,
+                j: usize,
+                l: usize,
+                r: usize,
+                current_node: usize,
+                val: T,
+            ) {
+                if r <= i || j <= l {
+                    return;
+                }
+                if r <= j && i <= l {
+                    // current interval is a subset of the query, so return it all
+                    self.values[current_node] = (self.query_op)(self.values[current_node], val);
+                    return;
+                }
+
+                let m = (l + r) / 2;
+                self.update_impl(i, j, l, m, left(current_node), val);
+                self.update_impl(i, j, m, r, right(current_node), val);
+            }
+
+            // Important: "initial" vector is not necessarily 1 based
+            pub fn new(
+                initial: Vec<T>,
+                query_neutral_element: T,
+                query_op: FQuery,
+            ) -> SegTree<T, FQuery> {
+                let size = 1 << ((initial.len() as f64).log2().ceil() as usize);
+                let mut values = vec![query_neutral_element; 2 * size];
+                for i in 0..initial.len() {
+                    values[i + size] = initial[i];
+                }
+
+                SegTree {
+                    values,
+                    size,
+                    query_neutral_element,
+                    query_op,
+                }
+            }
+
+            pub fn get_inner(&self) -> &[T] {
+                &self.values[self.size..]
+            }
+        }
+    }
+}
 /*
 
 ## Input sizes
