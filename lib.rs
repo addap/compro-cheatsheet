@@ -570,7 +570,11 @@ mod dijkstra {
         cost: u64,
     }
 
-    fn dijkstra(adj: &Vec<Vec<Edge>>, start: usize, goal: usize) -> Option<u64> {
+    // O((V+E) log V)
+    // 1 or 0 based: Dont care, just give the right start node
+    // result vector vec containts distances to other nodes
+    // u64::MAX == not reachable
+    fn dijkstra(adj: &Vec<Vec<Edge>>, start: usize) -> Vec<u64> {
         let n = adj.len();
         let mut dist = vec![u64::MAX; n];
         let mut pq = BinaryHeap::with_capacity(n);
@@ -579,10 +583,6 @@ mod dijkstra {
         pq.push(DEntry { v: start, cost: 0 });
 
         while let Some(DEntry { v, cost }) = pq.pop() {
-            if v == goal {
-                return Some(cost);
-            }
-
             if cost > dist[v] {
                 continue;
             }
@@ -599,7 +599,7 @@ mod dijkstra {
                 }
             }
         }
-        None
+        dist
     }
 }
 
@@ -1130,7 +1130,7 @@ mod mst {
         let mut edges: Vec<Edge> = vec![];
         let v = 0;
 
-        let mut UF = union_find::UnionFind::new(v);
+        let mut UF = union_find_adrian::UnionFind::new(v);
 
         edges.sort_unstable_by(|a, b| a.w.cmp(&b.w));
         let mut msp_edges = Vec::with_capacity(v);
@@ -1268,7 +1268,7 @@ mod querying {
     }
 }
 
-mod union_find {
+mod union_find_adrian {
     type N = usize;
 
     pub struct UnionFind {
@@ -1561,11 +1561,12 @@ mod lca_binarylift {
     }
 }
 
-mod unionfind {
+mod unionfind_alex {
 
     pub struct UnionFind {
         pub parent: Vec<usize>,
         rank: Vec<usize>,
+        count: Vec<usize>,
     }
 
     impl UnionFind {
@@ -1573,7 +1574,12 @@ mod unionfind {
             UnionFind {
                 parent: (0..n).collect(),
                 rank: vec![0; n],
+                count: vec![1; n],
             }
+        }
+        pub fn get_count(&mut self, x: usize) -> usize {
+            let y = self.find(x);
+            return self.count[y];
         }
         pub fn find(&mut self, x: usize) -> usize {
             if self.parent[x] == x {
@@ -1590,8 +1596,13 @@ mod unionfind {
             if i != j {
                 if self.rank[i] > self.rank[j] {
                     self.parent[j] = i;
+
+                    self.count[i] = self.count[i] + self.count[j];
                 } else {
                     self.parent[i] = j;
+
+                    self.count[j] = self.count[i] + self.count[j];
+
                     if self.rank[i] == self.rank[j] {
                         self.rank[j] += 1;
                     }
@@ -1608,7 +1619,7 @@ fn kruskal_minimum_spanning_tree(
     num_nodes: usize,
     weighted_edges: &mut Vec<(usize, usize, i64)>,
 ) -> HashSet<(usize, usize)> {
-    let mut uf = unionfind::UnionFind::new(num_nodes);
+    let mut uf = unionfind_alex::UnionFind::new(num_nodes);
     let mut mst = HashSet::new();
     weighted_edges.sort_by_key(|(_, _, v)| *v);
     for &(s, d, _) in weighted_edges.iter() {
@@ -2396,6 +2407,7 @@ mod segtree_pointupdate_rangequery {
                 )
             }
 
+            /// queries: [i, j). j is EXCLUSIVE
             pub fn query(&self, i: usize, j: usize) -> T {
                 self.query_impl(i, j, 0, self.size, 1)
             }
