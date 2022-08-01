@@ -570,7 +570,11 @@ mod dijkstra {
         cost: u64,
     }
 
-    fn dijkstra(adj: &Vec<Vec<Edge>>, start: usize, goal: usize) -> Option<u64> {
+    // O((V+E) log V)
+    // 1 or 0 based: Dont care, just give the right start node
+    // result vector vec containts distances to other nodes
+    // u64::MAX == not reachable
+    fn dijkstra(adj: &Vec<Vec<Edge>>, start: usize) -> Vec<u64> {
         let n = adj.len();
         let mut dist = vec![u64::MAX; n];
         let mut pq = BinaryHeap::with_capacity(n);
@@ -579,10 +583,6 @@ mod dijkstra {
         pq.push(DEntry { v: start, cost: 0 });
 
         while let Some(DEntry { v, cost }) = pq.pop() {
-            if v == goal {
-                return Some(cost);
-            }
-
             if cost > dist[v] {
                 continue;
             }
@@ -599,7 +599,7 @@ mod dijkstra {
                 }
             }
         }
-        None
+        dist
     }
 }
 
@@ -2395,6 +2395,7 @@ mod segtree_pointupdate_rangequery {
                 )
             }
 
+            /// queries: [i, j). j is EXCLUSIVE
             pub fn query(&self, i: usize, j: usize) -> T {
                 self.query_impl(i, j, 0, self.size, 1)
             }
