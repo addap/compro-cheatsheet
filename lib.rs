@@ -2574,6 +2574,175 @@ mod segtree_rangeupdate_pointquery {
     }
 }
 
+/***************************** DANGER: BAD CODE (because not Rust) **********
+// This code is mostly taken from the examples git repo.
+
+
+
+
+
+#include <bits/stdc++.h>
+#include <utility>
+#define int long long
+
+using namespace std;
+
+// This is taken from the official repo and modified so it prints all matches and not just the count
+
+// Implementation of a trie node for Aho-Corasick
+
+// The "cout << ..." command can be replaced by something different
+// (e.g. by something that puts the number in a result vector).
+
+// Note that the number of matches will also be printed for position -1,
+// which equals the number of empty strings fed into the algorithm
+// (empty strings already match at the beginning of the string, even when
+// no character has been read yet).
+
+
+vector<int> matches_ending; // for each position, the number of matched
+vector<int> matches_round2; // for each position, the number of matched
+bool is_phase2 = false;
+
+struct ACTrie {
+
+    map<char, ACTrie*> edges; // Outgoing edges of the trie node
+    ACTrie* lsp = nullptr; // Longest Suffix-Prefix
+
+    // Number of input strings being a suffix
+    // of the string associated with this trie node.
+    int cnt = 0;
+    set<int> allMatches;
+
+    void insert(string &t, int str_id, int i = 0) {
+        if (i == t.length()) {
+            cnt++;
+            allMatches.insert(str_id);
+            return;
+        }
+        if (edges.count(t[i]) == 0)
+            edges[t[i]] = new ACTrie;
+        edges[t[i]]->insert(t, str_id, i+1);
+    }
+
+    // Searches at the current node for matches in the string s[i..].
+    // 'print' denotes whether the number of matches should be printed
+    // for the current position. The only case when we don't want this is
+    // when an LSP-jump has been done, and the correct result for i has already
+    // been printed.
+    void search(string &s, int i = 0, bool print = true) {
+        if (print){
+            if (i >= 1) {
+                //cout << cnt << " matches ending at " << i-1 << "\n";
+                if(is_phase2) {
+                    matches_round2[i-1] += cnt;
+                }
+                else {
+                    matches_ending[i-1] += cnt;
+                }
+            }
+        }
+
+        if (i == s.length()) return; // processing of the string is done
+
+        if (edges.count(s[i]) == 0) {
+            // The trie node doesn't have the needed character edge...
+            if (lsp == nullptr) search(s, i+1, true); // we are at the root node
+            else lsp->search(s, i, false); // try to continue search at the LSP
+        } else {
+            // Edge was found, continue search there and advance the string
+            // pointer by one...
+            edges[s[i]]->search(s, i+1, true);
+        }
+    }
+};
+
+// Should be called after inserting strings into the trie and before searching
+// for matches in another string.
+void preprocess(ACTrie &root) {
+    queue<ACTrie*> q;
+    root.lsp = nullptr; q.push(&root);
+    while (!q.empty()) {
+        ACTrie *u = q.front(); q.pop();
+        for (auto it : u->edges) { // edge u--c-->v
+            char c = it.first; ACTrie *v = it.second;
+
+            // the 'lsp' and 'cnt' values of v will be calculated now...
+            ACTrie *l = u->lsp;
+            while (l != nullptr && l->edges.count(c) == 0)
+                l = l->lsp;
+            if (l == nullptr) {
+                v->lsp = &root; // there is no strict suffix-prefix
+            } else {
+                v->lsp = l->edges[c];
+                v->cnt += v->lsp->cnt;
+                v->allMatches.insert(v->lsp->allMatches.begin(), v->lsp->allMatches.end());
+            }
+            q.push(v);
+        }
+    }
+}
+
+
+// The following code shows how to use the implementation above.
+// As an example, it first reads the small strings that will be matched.
+// It follows a list of large strings, in which all matches of the small
+// strings are to be found.
+
+// Example Input:
+/*
+6
+baba
+b
+abab
+ababac
+abaca
+ac
+1
+abaababcababaca
+*/
+int32_t main() {
+    ACTrie root;
+    ACTrie root_rev;
+
+    string big_str; cin >> big_str;
+    int N = big_str.length();
+    int k; cin >> k;
+    //vector<string> ts;
+    for (int i = 0; i < k; ++i) {
+        string t; cin >> t;
+        //ts.push_back(t);
+        root.insert(t, i);
+
+        string t2(t); std::reverse(t2.begin(), t2.end());
+        root_rev.insert(t2, i);
+    }
+    preprocess(root);
+    preprocess(root_rev);
+
+    is_phase2 = false;
+    matches_ending = vector<int>(N + 5);
+    root.search(big_str);
+
+
+    std::reverse(big_str.begin(), big_str.end());
+    is_phase2 = true;
+    matches_round2 = vector<int>(N + 5);
+    root_rev.search(big_str);
+
+    long long sum = 0;
+    for(int i = 0; i < N - 1; i++) {
+        int num_ending = matches_ending[i];
+        int ind_starting = i+1;
+        ind_starting = N - ind_starting - 1; // reverse
+        int num_starting = matches_round2[ind_starting];
+        sum += num_ending * num_starting;
+    }
+    cout << sum << "\n";
+}
+
+*/
+
 /*
 
 ## Input sizes
