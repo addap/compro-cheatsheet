@@ -1457,6 +1457,36 @@ mod kmp {
     }
 }
 
+mod mathstuff {
+
+    // change usize to your type of desire accordingly
+    fn gcd(mut a: usize, mut b: usize) -> usize {
+        if a < b {
+            swap(&mut a, &mut b);
+        }
+        if b == 0 {
+            return a;
+        }
+        let r = a % b;
+        gcd(b, r)
+    }
+
+    // returns (x,y, gcd(a,b)) such that a*x + b*y = gcd(a,b)
+    fn extended_euclidean(mut a: i32, mut b: i32) -> (i32, i32, i32) {
+        let mut x1 = 1;
+        let mut y1 = 0;
+        let mut x2 = 0;
+        let mut y2 = 1;
+        let (mut d, mut r) = (a / b, a % b);
+        while r > 0 {
+            (x1, y1, x2, y2, a, b) = (x2, y2, x1 - d * x2, y1 - d * y2, b, r);
+            (d, r) = (a / b, a % b);
+        }
+
+        (x2, y2, b)
+    }
+}
+
 /*
 ## Tests
 cargo run --bin XXX < ./testfile.in
