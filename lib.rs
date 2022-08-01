@@ -1708,7 +1708,6 @@ mod kmp {
     }
 }
 
-
 mod edit_distance {
 
     // The edit (Levenstein) distance of two strings
@@ -1728,38 +1727,63 @@ mod edit_distance {
         let s: String = iter.next().unwrap().parse().unwrap();
         let t: String = iter.next().unwrap().parse().unwrap();
 
-        let mut dp: Vec<Vec<(usize, Op)>> = vec![vec![(0, Op::NotModify); t.len() + 1]; s.len() + 1];
+        let mut dp: Vec<Vec<(usize, Op)>> =
+            vec![vec![(0, Op::NotModify); t.len() + 1]; s.len() + 1];
         // init
-        for i in 0..=s.len() { dp[i][0] = (i, Op::Remove) ; }
-        for j in 0..=t.len() { dp[0][j] = (j, Op::Insert); }
+        for i in 0..=s.len() {
+            dp[i][0] = (i, Op::Remove);
+        }
+        for j in 0..=t.len() {
+            dp[0][j] = (j, Op::Insert);
+        }
         dp[0][0] = (0, Op::NotModify);
         for i in 1..=s.len() {
             for j in 1..=t.len() {
-                if s.as_bytes()[i-1] == t.as_bytes()[j-1] {
-                    dp[i][j] = (dp[i-1][j-1].0, Op::NotModify);
-                }
-                else {
-                    let modify_op = dp[i-1][j-1].0 + 1;
-                    let remove_op = dp[i-1][j].0 + 1;
-                    let insert_op = dp[i][j-1].0 + 1;
-                    let m = min( modify_op, min(remove_op, insert_op));
-                    let op = if m == modify_op { Op::Modify } else { if m == remove_op { Op::Remove } else { Op::Insert } };
+                if s.as_bytes()[i - 1] == t.as_bytes()[j - 1] {
+                    dp[i][j] = (dp[i - 1][j - 1].0, Op::NotModify);
+                } else {
+                    let modify_op = dp[i - 1][j - 1].0 + 1;
+                    let remove_op = dp[i - 1][j].0 + 1;
+                    let insert_op = dp[i][j - 1].0 + 1;
+                    let m = min(modify_op, min(remove_op, insert_op));
+                    let op = if m == modify_op {
+                        Op::Modify
+                    } else {
+                        if m == remove_op {
+                            Op::Remove
+                        } else {
+                            Op::Insert
+                        }
+                    };
                     dp[i][j] = (m, op);
                 }
             }
         }
 
-        println!("Edit distance: {}", dp[s.len()][ t.len()].0);
+        println!("Edit distance: {}", dp[s.len()][t.len()].0);
 
         // reconstruct
         // The modification is output in REVERSE order
         let (mut i, mut j) = (s.len(), t.len());
-        while (i, j) != (0,0) {
+        while (i, j) != (0, 0) {
             (i, j) = match dp[i][j].1 {
-                Op::NotModify => (i-1, j-1),
-                Op::Insert => { println!("Insert letter {}", t.as_bytes()[j-1] as char); (i, j-1)}  ,
-                Op::Remove => { println!("Remove letter {}", s.as_bytes()[i-1] as char); (i-1, j)}  ,
-                Op::Modify => { println!("Modify letter {}-> {}", s.as_bytes()[i-1] as char, t.as_bytes()[j-1] as char); (i-1, j-1)},
+                Op::NotModify => (i - 1, j - 1),
+                Op::Insert => {
+                    println!("Insert letter {}", t.as_bytes()[j - 1] as char);
+                    (i, j - 1)
+                }
+                Op::Remove => {
+                    println!("Remove letter {}", s.as_bytes()[i - 1] as char);
+                    (i - 1, j)
+                }
+                Op::Modify => {
+                    println!(
+                        "Modify letter {}-> {}",
+                        s.as_bytes()[i - 1] as char,
+                        t.as_bytes()[j - 1] as char
+                    );
+                    (i - 1, j - 1)
+                }
             };
         }
     }
@@ -1927,6 +1951,68 @@ mod trie {
     }
 }
 
+mod maxflow {
+
+    // edmonson-karp algorithm
+    // runtime O(V * E^2)
+    const UNVISITED: usize = usize::MAX;
+    fn maxflow(adj: &Vec<Vec<usize>>, capacity: &mut Vec<Vec<i64>>, s: usize, t: usize) -> i64 {
+        //
+        let n = adj.len();
+        let mut totalflow = 0;
+
+        loop {
+            let parent = bfs(adj, capacity, s);
+            if parent[t] == UNVISITED {
+                // t unreachable
+                break;
+            }
+
+            let mut bottleneck = i64::MAX;
+            let mut u = t;
+            while u != s {
+                let v = parent[u];
+                bottleneck = min(bottleneck, capacity[v][u]);
+                u = v;
+            }
+
+            u = t;
+            while u != s {
+                let v = parent[u];
+                capacity[v][u] -= bottleneck;
+                capacity[u][v] += bottleneck;
+                u = v;
+            }
+            totalflow += bottleneck;
+        }
+
+        totalflow
+    }
+
+    fn bfs(
+        adj: &Vec<Vec<usize>>,
+        capacity: &Vec<Vec<i64>>,
+        s: usize,
+        // parent: &mut Vec<usize>,
+    ) -> Vec<usize> {
+        let n = adj.len();
+        let mut parent = vec![UNVISITED; n];
+        parent[s] = s;
+
+        let mut q = VecDeque::with_capacity(n);
+        q.push_back(s);
+
+        while let Some(u) = q.pop_front() {
+            for &v in &adj[u] {
+                if parent[v] == UNVISITED && capacity[u][v] > 0 {
+                    q.push_back(v);
+                    parent[v] = u;
+                }
+            }
+        }
+        parent
+    }
+}
 /*
 ## Tests
 cargo run --bin XXX < ./testfile.in
