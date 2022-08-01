@@ -2339,6 +2339,23 @@ mod maxflow {
     }
 }
 /*
+
+## Input sizes
+
+For a time limit of 1 second:
+
+| n         |  Runtime     |
+---------------------------
+| ≤ 10, 11  | O(n!), O(n⁶) |
+| ≤ 18..22  | O((2^n) * n) |
+| ≤ 100     | O(n⁴)        |
+| ≤ 400     | O(n³)        |
+| ≤ 2000    | O(n² *logn)  |
+| ≤ 10⁴     | O(n²)        |
+| ≤ 10⁶     | O(n*logn)    |
+| ≤ 10⁸     | O(n)         |
+
+
 ## Tests
 cargo run --bin XXX < ./testfile.in
 
