@@ -1457,6 +1457,63 @@ mod kmp {
     }
 }
 
+
+mod edit_distance {
+
+    // The edit (Levenstein) distance of two strings
+
+    #[derive(Copy, Clone, Debug)]
+    enum Op {
+        NotModify,
+        Insert,
+        Remove,
+        Modify,
+    }
+
+    fn main() {
+        let mut buffer = String::new();
+        io::stdin().read_to_string(&mut buffer).unwrap();
+        let mut iter = buffer.split_whitespace();
+        let s: String = iter.next().unwrap().parse().unwrap();
+        let t: String = iter.next().unwrap().parse().unwrap();
+
+        let mut dp: Vec<Vec<(usize, Op)>> = vec![vec![(0, Op::NotModify); t.len() + 1]; s.len() + 1];
+        // init
+        for i in 0..=s.len() { dp[i][0] = (i, Op::Remove) ; }
+        for j in 0..=t.len() { dp[0][j] = (j, Op::Insert); }
+        dp[0][0] = (0, Op::NotModify);
+        for i in 1..=s.len() {
+            for j in 1..=t.len() {
+                if s.as_bytes()[i-1] == t.as_bytes()[j-1] {
+                    dp[i][j] = (dp[i-1][j-1].0, Op::NotModify);
+                }
+                else {
+                    let modify_op = dp[i-1][j-1].0 + 1;
+                    let remove_op = dp[i-1][j].0 + 1;
+                    let insert_op = dp[i][j-1].0 + 1;
+                    let m = min( modify_op, min(remove_op, insert_op));
+                    let op = if m == modify_op { Op::Modify } else { if m == remove_op { Op::Remove } else { Op::Insert } };
+                    dp[i][j] = (m, op);
+                }
+            }
+        }
+
+        println!("Edit distance: {}", dp[s.len()][ t.len()].0);
+
+        // reconstruct
+        // The modification is output in REVERSE order
+        let (mut i, mut j) = (s.len(), t.len());
+        while (i, j) != (0,0) {
+            (i, j) = match dp[i][j].1 {
+                Op::NotModify => (i-1, j-1),
+                Op::Insert => { println!("Insert letter {}", t.as_bytes()[j-1] as char); (i, j-1)}  ,
+                Op::Remove => { println!("Remove letter {}", s.as_bytes()[i-1] as char); (i-1, j)}  ,
+                Op::Modify => { println!("Modify letter {}-> {}", s.as_bytes()[i-1] as char, t.as_bytes()[j-1] as char); (i-1, j-1)},
+            };
+        }
+    }
+}
+
 mod mathstuff {
 
     // change usize to your type of desire accordingly
