@@ -1372,6 +1372,91 @@ fn kruskal_minimum_spanning_tree(
     mst
 }
 
+mod kmp {
+    // String searching: KMP
+    // if m = |t| and n = |s|, we have:
+    // precalculation in O(m)
+    // finding matches in O(n)
+    // O(n+m) (where n and m are the string sizes)
+
+    // calculates the longest suffix prefix
+    // but can also calculate "shorter" suffix prefixes if the given one is not "ok"
+    fn advanced_lsp(t: &str, is_ok: impl Fn(usize) -> bool) -> usize {
+        let mut lsp = vec![0; t.len()];
+        let mut i = 1;
+        let mut prev = 0;
+        let m = t.len();
+        while i < m {
+            if t.as_bytes()[i] == t.as_bytes()[prev] {
+                prev += 1;
+                lsp[i] = prev;
+                i += 1;
+            } else if prev == 0 {
+                lsp[i] = 0;
+                i += 1;
+            } else {
+                prev = lsp[prev - 1];
+            }
+        }
+
+        let mut res = lsp[t.len() - 1];
+        while !is_ok(res) {
+            res = lsp[res - 1];
+        }
+        return res;
+    }
+
+    // longest suffix prefix array: if t = t_0...t_(m-1), then
+    // lsp[i] is the longest (strict) suffix prefix of t_0....t_i
+    // that is: lsp[m-1] is the LSP of the full string t
+    fn lsp(t: &str) -> Vec<usize> {
+        let mut lsp = vec![0; t.len()];
+        let mut i = 1;
+        let mut prev = 0;
+        let m = t.len();
+        while i < m {
+            if t.as_bytes()[i] == t.as_bytes()[prev] {
+                prev += 1;
+                lsp[i] = prev;
+                i += 1;
+            } else if prev == 0 {
+                lsp[i] = 0;
+                i += 1;
+            } else {
+                prev = lsp[prev - 1];
+            }
+        }
+
+        return lsp;
+    }
+
+    fn kmp(s: &str, t: &str) -> Option<usize> {
+        let lsp = lsp(&t);
+        let n = s.len();
+        let m = t.len();
+        let mut start: i64 = 0;
+        let mut l: i64 = 0;
+        while start + l < (n as i64) {
+            while l >= (m as i64) || s.as_bytes()[(start + l) as usize] != t.as_bytes()[l as usize]
+            {
+                if l == 0 {
+                    start += 1;
+                    l -= 1;
+                    break;
+                }
+                let skip = l - (lsp[(l - 1) as usize] as i64);
+                start += skip;
+                l -= skip;
+            }
+            l += 1;
+            if l as usize == m {
+                return Some(start as usize);
+            }
+        }
+        return None;
+    }
+}
+
 /*
 ## Tests
 cargo run --bin XXX < ./testfile.in
