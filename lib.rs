@@ -911,6 +911,9 @@ mod tarjan {
         sccs
     }
 
+    // if we want the view the strongly connected components as a dag we need to build a new structure
+    // the dag nodes are the first node of each component and the edges are all edges that go into or out of the component.
+    // don't call the function, just paste the code
     fn sccs_to_dag(n: usize, adj: &Vec<Vec<usize>>, comps: &Vec<Vec<usize>>) {
         let mut repr_to_comp = HashMap::with_capacity(comps.len());
         let mut comp_to_repr = HashMap::with_capacity(n);
@@ -1098,6 +1101,51 @@ mod euler {
     }
 }
 
+// --------- TREES    ---------
+// number of unique paths in a tree
+// (V over 2) = (v * (v-1))/2
+
+// for an unidirected graph, the following are equivalent
+// G is a tree
+// G is acyclic and connected
+// between any two vertices of G, there is exactly one path
+// G is acyclic and E = V - 1
+// G is connected and E = V - 1
+// G is minimally connected
+// G is maximally acyclic
+
+mod mst {
+    use crate::union_find;
+
+    #[derive(Debug, Clone, Copy)]
+    struct Edge {
+        u: usize,
+        v: usize,
+        w: u64,
+    }
+
+    // do union find and add edges in increasing order until all nodes are in the same set
+    fn mst() {
+        // dummy variables
+        let mut edges: Vec<Edge> = vec![];
+        let v = 0;
+
+        let mut UF = union_find::UnionFind::new(v);
+
+        edges.sort_unstable_by(|a, b| a.w.cmp(&b.w));
+        let mut msp_edges = Vec::with_capacity(v);
+
+        for edge in &edges {
+            if !UF.is_same_set(edge.u, edge.v) {
+                UF.union_set(edge.u, edge.v);
+                msp_edges.push(edge.clone());
+            }
+        }
+
+        println!("{}", msp_edges[msp_edges.len() - 1].w);
+    }
+}
+
 // --------- QUERYING ---------
 mod querying {
     use std::io::{self, Read};
@@ -1268,3 +1316,574 @@ mod union_find {
         }
     }
 }
+
+mod lca_tarjan {
+
+    use crate::union_find::*;
+    use std::{
+        cmp::{max, min, Ordering},
+        collections::{HashMap, HashSet, VecDeque},
+        io::{self, Read},
+    };
+    fn main() {
+        let mut input = String::new();
+        io::stdin().read_to_string(&mut input).unwrap();
+
+        let mut tokens = input.split_ascii_whitespace();
+        macro_rules! next_token {
+            ( $t:ty ) => {
+                tokens.next().unwrap().parse::<$t>().unwrap()
+            };
+        }
+
+        let n = next_token!(usize);
+        let q = next_token!(usize);
+
+        let mut adj = vec![Vec::new(); n];
+        let mut map = HashMap::with_capacity(2 * n);
+        let mut map2 = vec![""; 2 * n];
+
+        for i in 0..n {
+            let name = tokens.next().unwrap();
+
+            map.insert(name, i);
+            map2[i] = name;
+        }
+
+        for child in 1..n {
+            let mother = tokens.next().unwrap();
+
+            let mother_v = *map.get(mother).unwrap();
+            adj[mother_v].push(child);
+        }
+
+        let depth = bfs(&adj, 0);
+
+        let mut all_queries = Vec::with_capacity(q);
+        let mut query_answer = vec![(0, 0); q];
+        let mut queries = vec![Vec::new(); n];
+        for i in 0..q {
+            let a = tokens.next().unwrap();
+            let b = tokens.next().unwrap();
+
+            let a_v = *map.get(a).unwrap();
+            let b_v = *map.get(b).unwrap();
+
+            all_queries.push((a_v, b_v));
+            queries[a_v].push(i);
+            if a_v != b_v {
+                queries[b_v].push(i);
+            }
+        }
+
+        let mut ancestors = (0..n).collect::<Vec<_>>();
+        let mut visited = vec![false; n];
+        let mut UF = UnionFind::new(n);
+
+        dfs(
+            &adj,
+            0,
+            &mut UF,
+            &mut ancestors,
+            &queries,
+            &all_queries,
+            &mut query_answer,
+            &mut visited,
+            &depth,
+        );
+
+        for &(ancestor, p) in &query_answer {
+            println!("{} {}", map2[ancestor], p);
+        }
+    }
+
+    fn dfs(
+        adj: &Vec<Vec<usize>>,
+        start: usize,
+        UF: &mut UnionFind,
+        ancestors: &mut Vec<usize>,
+        queries: &Vec<Vec<usize>>,
+        all_queries: &Vec<(usize, usize)>,
+        query_answer: &mut Vec<(usize, usize)>,
+        visited: &mut Vec<bool>,
+        depth: &Vec<usize>,
+    ) {
+        for &neighbor in &adj[start] {
+            dfs(
+                adj,
+                neighbor,
+                UF,
+                ancestors,
+                queries,
+                all_queries,
+                query_answer,
+                visited,
+                depth,
+            );
+            UF.union_set(start, neighbor);
+            ancestors[UF.find_set(start)] = start;
+        }
+
+        visited[start] = true;
+        for &qi in &queries[start] {
+            let (a, b) = all_queries[qi];
+
+            if visited[a] && visited[b] {
+                // hack to find the ancestor with minimal depth since we lose the order of start,other and a,b
+                let ancestor = {
+                    let aa = ancestors[UF.find_set(a)];
+                    let ab = ancestors[UF.find_set(b)];
+
+                    if depth[aa] < depth[ab] {
+                        aa
+                    } else {
+                        ab
+                    }
+                };
+                let p = depth[a] + depth[b] - 2 * depth[ancestor];
+                query_answer[qi] = (ancestor, p);
+            }
+        }
+    }
+
+    fn bfs(adj: &Vec<Vec<usize>>, start: usize) -> Vec<usize> {
+        let n = adj.len();
+        let mut border = VecDeque::with_capacity(n);
+        border.push_back((start, 0));
+
+        let mut visited: Vec<bool> = vec![false; n];
+        visited[start] = true;
+        let mut depth = vec![0; n];
+
+        while !border.is_empty() {
+            let (v, d) = border.pop_front().unwrap();
+            depth[v] = d;
+
+            for &neighbor in &adj[v] {
+                if !visited[neighbor] {
+                    border.push_back((neighbor, d + 1));
+                    visited[neighbor] = true;
+                }
+            }
+        }
+
+        depth
+    }
+}
+
+mod lca_binarylift {
+    //////////////////
+    /// Usage: Get the tree as adjacency list (directed edges towards children only), n (num nodes), root node
+    /// Call precompute
+    /// Call lca
+    /// Profit
+    /// //////////////
+
+    //      node        adj-list                  height/depth        immediate parent
+    fn dfs(u: usize, graph: &Vec<Vec<usize>>, h: &mut Vec<usize>, p: &mut Vec<usize>) {
+        for &v in &graph[u] {
+            if v != p[u] {
+                p[v] = u;
+                h[v] = h[u] + 1;
+                dfs(v, graph, h, p);
+            }
+        }
+    }
+
+    pub struct Lca {
+        pub graph: Vec<Vec<usize>>,
+        // height such that the root has height 0
+        pub h: Vec<usize>,
+        // p[i][u] == 2^i-th ancestor of u; p[0][u] is the immediate parent of u
+        pub p: Vec<Vec<usize>>,
+    }
+
+    impl Lca {
+        // kth ancestor of node "u", 0th ancestor is u itself, 1st is direct parent etc
+        pub fn kth_ancestor(&self, u: usize, mut k: usize) -> usize {
+            let mut res = u;
+            // do binary lifting: decompose k into a binary string; for each 1 in it, we know the parent
+            for i in (0..(self.p.len())).rev() {
+                if k >= (1 << i) {
+                    // k has the "i"th one
+                    k -= (1 << i);
+                    res = self.p[i][res];
+                }
+            }
+            res
+        }
+
+        // O(N* log(N))
+        // n == number of nodes in graph
+        // graph == adj. list
+        pub fn precompute(n: usize, root: usize, graph: Vec<Vec<usize>>) -> Lca {
+            let l = ((graph.len() as f64).log2().ceil() as usize) + 1;
+            // depths
+            let mut h: Vec<usize> = vec![0; n];
+            let mut p: Vec<Vec<usize>> = vec![vec![0; n]; l];
+            p[0][root] = root;
+            // fill depths and immediate parents
+            dfs(root, &graph, &mut h, &mut p[0]);
+
+            for i in 1..l {
+                for j in 0..n {
+                    // for example, the 8th parent == 4th parent of the 4th parent
+                    p[i][j] = p[i - 1][p[i - 1][j]];
+                }
+            }
+
+            Lca { graph, h, p }
+        }
+
+        // O(log(N))
+        pub fn lca(&self, mut u: usize, mut v: usize) -> usize {
+            if self.h[v] > self.h[u] {
+                std::mem::swap(&mut u, &mut v);
+            }
+
+            // lift u to the level of v
+            u = self.kth_ancestor(u, self.h[u] - self.h[v]);
+            if u == v {
+                // v is some ancestor of u, so their lca is v
+                return v;
+            }
+
+            // do binary lifting, jump as much as possible such that u and v are still in separate branches
+            for i in (0..(self.p.len())).rev() {
+                if self.p[i][u] != self.p[i][v] {
+                    u = self.p[i][u];
+                    v = self.p[i][v];
+                }
+            }
+
+            self.p[0][u]
+        }
+    }
+}
+
+mod unionfind {
+
+    pub struct UnionFind {
+        pub parent: Vec<usize>,
+        rank: Vec<usize>,
+    }
+
+    impl UnionFind {
+        pub fn new(n: usize) -> UnionFind {
+            UnionFind {
+                parent: (0..n).collect(),
+                rank: vec![0; n],
+            }
+        }
+        pub fn find(&mut self, x: usize) -> usize {
+            if self.parent[x] == x {
+                return x;
+            } else {
+                self.parent[x] = self.find(self.parent[x]);
+                return self.parent[x];
+            }
+        }
+
+        pub fn union(&mut self, x1: usize, x2: usize) {
+            let i = self.find(x1);
+            let j = self.find(x2);
+            if i != j {
+                if self.rank[i] > self.rank[j] {
+                    self.parent[j] = i;
+                } else {
+                    self.parent[i] = j;
+                    if self.rank[i] == self.rank[j] {
+                        self.rank[j] += 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// calculates the MST (minimum spanning tree) in O(N*Log(N)). Graph given as edge list.
+// Returns the edges that are part of MST (the resulting set is symmetric since undirected edges are considered)
+// After the algorithm, the input edges are sorted
+fn kruskal_minimum_spanning_tree(
+    num_nodes: usize,
+    weighted_edges: &mut Vec<(usize, usize, i64)>,
+) -> HashSet<(usize, usize)> {
+    let mut uf = unionfind::UnionFind::new(num_nodes);
+    let mut mst = HashSet::new();
+    weighted_edges.sort_by_key(|(_, _, v)| *v);
+    for &(s, d, _) in weighted_edges.iter() {
+        if uf.find(s) != uf.find(d) {
+            uf.union(s, d);
+
+            mst.insert((s, d));
+            mst.insert((d, s));
+        }
+    }
+
+    mst
+}
+
+mod kmp {
+    // String searching: KMP
+    // if m = |t| and n = |s|, we have:
+    // precalculation in O(m)
+    // finding matches in O(n)
+    // O(n+m) (where n and m are the string sizes)
+
+    // calculates the longest suffix prefix
+    // but can also calculate "shorter" suffix prefixes if the given one is not "ok"
+    fn advanced_lsp(t: &str, is_ok: impl Fn(usize) -> bool) -> usize {
+        let mut lsp = vec![0; t.len()];
+        let mut i = 1;
+        let mut prev = 0;
+        let m = t.len();
+        while i < m {
+            if t.as_bytes()[i] == t.as_bytes()[prev] {
+                prev += 1;
+                lsp[i] = prev;
+                i += 1;
+            } else if prev == 0 {
+                lsp[i] = 0;
+                i += 1;
+            } else {
+                prev = lsp[prev - 1];
+            }
+        }
+
+        let mut res = lsp[t.len() - 1];
+        while !is_ok(res) {
+            res = lsp[res - 1];
+        }
+        return res;
+    }
+
+    // longest suffix prefix array: if t = t_0...t_(m-1), then
+    // lsp[i] is the longest (strict) suffix prefix of t_0....t_i
+    // that is: lsp[m-1] is the LSP of the full string t
+    fn lsp(t: &str) -> Vec<usize> {
+        let mut lsp = vec![0; t.len()];
+        let mut i = 1;
+        let mut prev = 0;
+        let m = t.len();
+        while i < m {
+            if t.as_bytes()[i] == t.as_bytes()[prev] {
+                prev += 1;
+                lsp[i] = prev;
+                i += 1;
+            } else if prev == 0 {
+                lsp[i] = 0;
+                i += 1;
+            } else {
+                prev = lsp[prev - 1];
+            }
+        }
+
+        return lsp;
+    }
+
+    fn kmp(s: &str, t: &str) -> Option<usize> {
+        let lsp = lsp(&t);
+        let n = s.len();
+        let m = t.len();
+        let mut start: i64 = 0;
+        let mut l: i64 = 0;
+        while start + l < (n as i64) {
+            while l >= (m as i64) || s.as_bytes()[(start + l) as usize] != t.as_bytes()[l as usize]
+            {
+                if l == 0 {
+                    start += 1;
+                    l -= 1;
+                    break;
+                }
+                let skip = l - (lsp[(l - 1) as usize] as i64);
+                start += skip;
+                l -= skip;
+            }
+            l += 1;
+            if l as usize == m {
+                return Some(start as usize);
+            }
+        }
+        return None;
+    }
+}
+
+mod mathstuff {
+    use std::cmp::max;
+    use std::mem::swap;
+
+    fn gcd_iter(mut a: u64, mut b: u64) -> u64 {
+        if a == 0 || b == 0 {
+            return max(a, b);
+        }
+
+        let mut tmp;
+
+        while b != 0 {
+            tmp = b;
+            b = a % b;
+            a = tmp;
+        }
+
+        return a;
+    }
+
+    // change usize to your type of desire accordingly
+    fn gcd(mut a: usize, mut b: usize) -> usize {
+        if a < b {
+            swap(&mut a, &mut b);
+        }
+        if b == 0 {
+            return a;
+        }
+        let r = a % b;
+        gcd(b, r)
+    }
+
+    // returns (x,y, gcd(a,b)) such that a*x + b*y = gcd(a,b)
+    fn extended_euclidean(mut a: i32, mut b: i32) -> (i32, i32, i32) {
+        let mut x1 = 1;
+        let mut y1 = 0;
+        let mut x2 = 0;
+        let mut y2 = 1;
+        let (mut d, mut r) = (a / b, a % b);
+        while r > 0 {
+            (x1, y1, x2, y2, a, b) = (x2, y2, x1 - d * x2, y1 - d * y2, b, r);
+            (d, r) = (a / b, a % b);
+        }
+
+        (x2, y2, b)
+    }
+
+    fn fexp(n: usize, k: usize, p: usize) -> usize {
+        if k == 0 {
+            return 1;
+        } else if k % 2 == 0 {
+            let r = fexp(n, k / 2, p);
+            return (r * r) % p;
+        } else {
+            return (n * fexp(n, k - 1, p)) % p;
+        }
+    }
+
+    fn modinv(n: usize, p: usize) -> usize {
+        fexp(n, p - 2, p)
+    }
+
+    fn fac_modp(n: usize, p: usize) -> usize {
+        let mut res = 1;
+        for i in 2..=n {
+            res = (res * i) % p;
+        }
+        res
+    }
+
+    fn binom_modp(n: usize, mut k: usize, p: usize) -> usize {
+        // we absolutely need to make sure that k <= (n/2)
+        if 2 * k > n {
+            k = n - k;
+        }
+        let mut res = 1;
+        for i in (n - k + 1)..=n {
+            res = (res * i) % p;
+        }
+        (res * modinv(fac_modp(k, p), p)) % p
+    }
+}
+
+/// ---------- IMPORTS ----------------
+mod trie {
+    use std::{
+        cmp::{max, min, Ordering},
+        collections::{HashMap, HashSet, VecDeque},
+        io::{self, Read},
+    };
+
+    /// next_token() Makro um whitespace-separated Zeug zu lesen
+    fn main() {
+        let mut input = String::new();
+        io::stdin().read_to_string(&mut input).unwrap();
+
+        let mut tokens = input.split_ascii_whitespace();
+        macro_rules! next_token {
+            ( $t:ty ) => {
+                tokens.next().unwrap().parse::<$t>().unwrap()
+            };
+        }
+
+        let mut trie = Trie::new();
+
+        let n = next_token!(usize);
+
+        for _ in 0..n {
+            let op = tokens.next().unwrap();
+            let arg = tokens.next().unwrap().as_bytes();
+
+            match op {
+                "add" => {
+                    trie.insert(arg);
+                }
+                "find" => {
+                    let num = trie.find(arg);
+                    println!("{}", num);
+                }
+                _ => unreachable!("unknown op"),
+            }
+        }
+    }
+
+    struct Trie {
+        prefix_num: usize,
+        children: HashMap<u8, Trie>,
+    }
+
+    impl Trie {
+        fn new() -> Self {
+            Self {
+                prefix_num: 0,
+                children: HashMap::new(),
+            }
+        }
+
+        fn insert(&mut self, s: &[u8]) {
+            self.prefix_num += 1;
+
+            if s.is_empty() {
+                return;
+            }
+
+            let child = self.children.entry(s[0]).or_insert(Trie::new());
+            child.insert(&s[1..]);
+        }
+
+        fn find(&self, s: &[u8]) -> usize {
+            if s.is_empty() {
+                self.prefix_num
+            } else {
+                if self.children.contains_key(&s[0]) {
+                    self.children.get(&s[0]).unwrap().find(&s[1..])
+                } else {
+                    return 0;
+                }
+            }
+        }
+    }
+}
+
+/*
+## Tests
+cargo run --bin XXX < ./testfile.in
+
+## SSSP
+single source shortest path
+
+|                | BFS     | Dijkstra          | Bellman-Ford          | Flo✓d Warshall    |
+|-|-|-|-|-|
+| Running Time   | O(V+E) | O((V+E)\*log V) | O(VE) | O(V^3) |
+| Max Size       | V, E <= 10^7 | V, E <= 10^6 | V * E <= 10^7 | V <= 500 |
+| Unweighted     | ✓ | ✓ | ✓ | ✓ |
+| Weighted       | ✗ | ✓ | ✓ | ✓ |
+| Neg Weights    | ✗ | ✗ | ✓ | ✓ |
+| Sparse (E ~ V) | O(V) | O(V*log V) | O(V^2) | O(V^3) |
+| Dense (E ~ V^2)| O(V^2) | O(V^2 * log V) | O(V^3) | O(V^3) |
+*/
