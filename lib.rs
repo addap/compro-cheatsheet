@@ -2586,6 +2586,78 @@ mod segtree_rangeupdate_pointquery {
         }
     }
 }
+
+mod hamilton {
+    use std::{
+        cmp::{max, min, Ordering},
+        collections::{HashMap, HashSet, VecDeque},
+        io::{self, Read},
+    };
+
+    /// Lichten Graph lesen mit Adjazenzlisten
+    fn main() {
+        let mut input = String::new();
+        io::stdin().read_to_string(&mut input).unwrap();
+
+        let mut tokens = input.split_ascii_whitespace();
+        macro_rules! next_token {
+            ( $t:ty ) => {
+                tokens.next().unwrap().parse::<$t>().unwrap()
+            };
+        }
+
+        let n = next_token!(usize);
+        let m = next_token!(usize);
+
+        let mut adj = vec![vec![u64::MAX; n]; n];
+
+        for _ in 0..m {
+            let start = next_token!(usize);
+            let end = next_token!(usize);
+            let weight = next_token!(u64);
+
+            if start == end {
+                continue;
+            }
+
+            adj[start - 1][end - 1] = min(weight, adj[start - 1][end - 1]);
+        }
+
+        let mut dp = vec![vec![u64::MAX; n]; 1 << n];
+
+        for v in 0..n {
+            dp[1 << v][v] = 0;
+        }
+
+        for X in 1usize..=1 << n {
+            if X.count_ones() < 2 {
+                continue;
+            }
+            for v in 0..n {
+                if X & (1 << v) == 0 {
+                    continue;
+                }
+
+                for u in 0..n {
+                    let path_weight = dp[X ^ (1 << v)][u];
+                    let uv_weight = adj[u][v];
+                    if path_weight < u64::MAX && uv_weight < u64::MAX {
+                        dp[X][v] = min(dp[X][v], path_weight + uv_weight);
+                    }
+                }
+            }
+        }
+
+        let min_path = *dp[dp.len() - 1].iter().min().unwrap();
+
+        if min_path == u64::MAX {
+            println!("impossible");
+        } else {
+            println!("{}", min_path);
+        }
+    }
+}
+
 /*
 
 ## Input sizes
